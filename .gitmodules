@@ -1,4 +1,0 @@
-[submodule "aiscript"]
-	path = aiscript
-	url = https://github.com/aiscript-dev/aiscript
-	branch = aiscript-next

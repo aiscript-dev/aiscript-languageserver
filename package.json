@@ -29,7 +29,7 @@
     "vitest": "^0.34.6"
   },
   "dependencies": {
-    "@syuilo/aiscript": "file:aiscript",
+    "@syuilo/aiscript": "github:aiscript-dev/aiscript#aiscript-next",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.11"
   },
