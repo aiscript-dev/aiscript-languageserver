@@ -20,7 +20,8 @@
     }
   },
   "scripts": {
-    "build": "tsc --build"
+    "build": "tsc --build",
+    "install": "npm run build"
   },
   "devDependencies": {
     "ts-node": "^10.9.1",
