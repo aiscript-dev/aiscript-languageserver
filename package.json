@@ -21,7 +21,8 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "prepare": "npm run build"
+    "prepare": "npm run install-aiscript && npm run build",
+    "install-aiscript": "git submodule update --init --recursive && npm i ./aiscript && cd aiscript && npm run build && cd .."
   },
   "devDependencies": {
     "ts-node": "^10.9.1",
@@ -29,7 +30,7 @@
     "vitest": "^0.34.6"
   },
   "dependencies": {
-    "@syuilo/aiscript": "github:aiscript-dev/aiscript#aiscript-next",
+    "@syuilo/aiscript": "file:aiscript",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.11"
   },
