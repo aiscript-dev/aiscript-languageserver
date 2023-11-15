@@ -2,7 +2,9 @@
   "type": "module",
   "name": "@aiscript-dev/aiscript-languageserver",
   "version": "0.1.0",
-  "bin": "./.dist/cli/index.js",
+  "bin": {
+    "aiscript-languageserver": "./.dist/cli/index.js"
+  },
   "exports": {
     ".": {
       "import": "./.dist/core/index.js",
