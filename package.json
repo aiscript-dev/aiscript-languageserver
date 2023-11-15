@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "install": "npm run build"
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "ts-node": "^10.9.1",
