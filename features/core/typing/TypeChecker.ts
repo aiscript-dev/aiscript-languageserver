@@ -1,4 +1,4 @@
-import { Ast } from "@syuilo/aiscript";
+import { Ast } from "@syuilo/aiscript/index.js";
 import { TypeError } from "../index.js";
 import { Scope } from "./Scope.js";
 import { TypeValue } from "./TypeValue.js";
