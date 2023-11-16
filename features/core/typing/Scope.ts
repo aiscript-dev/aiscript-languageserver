@@ -1,4 +1,4 @@
-import { Ast } from "@syuilo/aiscript";
+import { Ast } from "@syuilo/aiscript/index.js";
 import { AiAlreadyDeclaredVariableError } from "../errors/AiTypeError.js";
 import { TypeValue } from "./TypeValue.js";
 import { Variable } from "./Variable.js";

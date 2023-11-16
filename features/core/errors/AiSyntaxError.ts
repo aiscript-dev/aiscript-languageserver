@@ -1,6 +1,6 @@
 import { Token } from "@syuilo/aiscript/parser/token.js";
 import { SourceLocation } from "../parser/SourceRange.js";
-import { Ast } from "@syuilo/aiscript";
+import { Ast } from "@syuilo/aiscript/index.js";
 
 export enum AiSyntaxErrorId {
   invalidAttribute,
@@ -28,7 +28,7 @@ export class AiSyntaxError extends Error {
   constructor(
     public messageId: AiSyntaxErrorId,
     public token: Token | Ast.Node,
-    public location: SourceLocation,
+    public location: SourceLocation
   ) {
     super(AiSyntaxErrorId[messageId]);
   }
@@ -38,7 +38,7 @@ export class AiMissingKeywordError extends AiSyntaxError {
   constructor(
     public keyword: string,
     token: Token | Ast.Node,
-    location: SourceLocation,
+    location: SourceLocation
   ) {
     super(AiSyntaxErrorId.MissingKeyword, token, location);
   }
@@ -48,7 +48,7 @@ export class AiMissingBracketError extends AiSyntaxError {
   constructor(
     public bracket: string,
     token: Token | Ast.Node,
-    location: SourceLocation,
+    location: SourceLocation
   ) {
     super(AiSyntaxErrorId.MissingBracket, token, location);
   }

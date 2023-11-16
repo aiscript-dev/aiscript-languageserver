@@ -1,4 +1,4 @@
-import { Ast } from "@syuilo/aiscript";
+import { Ast } from "@syuilo/aiscript/index.js";
 import { Scanner } from "@syuilo/aiscript/parser/scanner.js";
 import { Token, TokenKind } from "@syuilo/aiscript/parser/token.js";
 import { ParserError } from "../errors/index.js";
