@@ -398,7 +398,12 @@ export class TypeChecker {
 
   preRunBlock(body: Ast.Node[], scope: Scope, errors: TypeError[]) {
     for (const node of body) {
-      this.preRun(node, scope, errors);
+      switch (node.type) {
+        case "ns": {
+          this.preRun(node, scope, errors);
+          break;
+        }
+      }
     }
   }
 

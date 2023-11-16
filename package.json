@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "@aiscript-dev/aiscript-languageserver",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "bin": {
     "aiscript-languageserver": "./.dist/cli/index.js"
   },
