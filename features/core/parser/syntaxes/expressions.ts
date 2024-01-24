@@ -256,6 +256,8 @@ function parsePostfix(
 
       if (s.kind !== (TokenKind.CloseBracket as TokenKind)) {
         e.push(new AiSyntaxError(AiSyntaxErrorId.MissingBracket, s.token, loc));
+      } else {
+        s.next();
       }
 
       return NODE(
@@ -374,7 +376,6 @@ function parseAtom(
       return parseReference(s, e) ?? NODE("null", {}, s.token.loc);
     }
     case TokenKind.OpenParen: {
-      const openParen = s.token;
       s.next();
 
       const expr = parseExpr(s, e, isStatic);
@@ -440,6 +441,8 @@ function parseCall(
             s.token.loc
           )
         );
+        s.next();
+        break;
       }
     }
   }
@@ -1033,7 +1036,7 @@ function parsePratt(
           )
         );
       } else {
-        s.next();
+        break;
       }
     }
 
@@ -1053,7 +1056,13 @@ function parsePratt(
       ) {
         // 前にスペースがある場合は後置演算子として処理しない
       } else {
-        left = parsePostfix(s, e, left) ?? NODE("null", {}, s.token.loc);
+        const expr = parsePostfix(s, e, left);
+        if (expr == null) {
+          e.push(
+            new AiSyntaxError(AiSyntaxErrorId.MissingExpr, s.token, s.token.loc)
+          );
+        }
+        left = expr ?? NODE("null", {}, s.token.loc);
         continue;
       }
     }

@@ -126,7 +126,7 @@ export function parseBlock(
       }
       default: {
         throw new AiScriptSyntaxError(
-          "Multiple statements cannot be placed on a single line.",
+          `Multiple statements cannot be placed on a single line.`,
           s.token.loc
         );
       }

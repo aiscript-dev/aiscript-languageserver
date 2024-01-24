@@ -144,7 +144,7 @@ function parseVarDef(s: ITokenStream, e: ParserError[]): Ast.Definition | null {
 
   let name: string;
   if (s.kind === (TokenKind.Identifier as TokenKind)) {
-    name = s.token.value!;
+    name = s.token.value ?? "";
 
     s.next();
   } else {

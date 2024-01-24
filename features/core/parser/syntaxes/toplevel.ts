@@ -61,7 +61,7 @@ export function parseTopLevel(s: ITokenStream, e: ParserError[]): Ast.Node[] {
       default: {
         throw new AiScriptSyntaxError(
           "Multiple statements cannot be placed on a single line.",
-          s.token.loc,
+          s.token.loc
         );
       }
     }
@@ -77,7 +77,7 @@ export function parseTopLevel(s: ITokenStream, e: ParserError[]): Ast.Node[] {
  */
 export function parseNamespace(
   s: ITokenStream,
-  e: ParserError[],
+  e: ParserError[]
 ): Ast.Namespace | null {
   const loc = s.token.loc;
 
@@ -133,8 +133,8 @@ export function parseNamespace(
           new AiSyntaxError(
             AiSyntaxErrorId.MultipleStatementsOnSingleLine,
             s.token,
-            s.token.loc,
-          ),
+            s.token.loc
+          )
         );
         return null;
       }
@@ -164,13 +164,13 @@ export function parseMeta(s: ITokenStream, e: ParserError[]): Ast.Meta {
   const value = parseExpr(s, e, true);
   if (value == null) {
     e.push(
-      new AiSyntaxError(AiSyntaxErrorId.MissingExpr, s.token, s.token.loc),
+      new AiSyntaxError(AiSyntaxErrorId.MissingExpr, s.token, s.token.loc)
     );
   }
 
   return NODE(
     "meta",
     { name, value: value ?? NODE("null", {}, s.token.loc) },
-    loc,
+    loc
   );
 }
