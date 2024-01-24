@@ -1,13 +1,14 @@
 import { Ast } from "@syuilo/aiscript/index.js";
 import { AiAlreadyDeclaredVariableError } from "../errors/AiTypeError.js";
-import { TypeValue } from "./TypeValue.js";
+import { TypeValue, ident, primitiveType } from "./TypeValue.js";
 import { Variable } from "./Variable.js";
 
 export class Scope {
   constructor(
     private parent?: Scope,
     private types = new Map<string, TypeValue>(),
-    private variables = new Map<string, Variable>()
+    private variables = new Map<string, Variable>(),
+    private overridedVariables = new Map<string, Variable>()
   ) {}
 
   copy() {
@@ -35,16 +36,23 @@ export class Scope {
   }
 
   defineVariable(ident: Ast.Identifier, variable: Variable) {
-    if (this.variables.has(ident.name) == null) {
+    if (this.variables.has(ident.name)) {
       return new AiAlreadyDeclaredVariableError(ident.name, ident.loc);
     }
 
     this.variables.set(ident.name, variable);
   }
 
+  overrideVariable(ident: Ast.Identifier, variable: Variable) {
+    this.overridedVariables.set(ident.name, variable);
+  }
+
   getVariable(ident: Ast.Identifier): Variable | null {
     return (
-      this.parent?.getVariable(ident) ?? this.variables.get(ident.name) ?? null
+      this.overridedVariables.get(ident.name) ??
+      this.parent?.getVariable(ident) ??
+      this.variables.get(ident.name) ??
+      null
     );
   }
 

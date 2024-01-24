@@ -2,10 +2,12 @@ import {
   AiAlreadyDeclaredVariableError,
   AiCanNotAssignToImmutableVariableError,
   AiCanNotCallError,
+  AiCanNotReadPropertyError,
   AiInvalidArgumentError,
   AiMissingArgumentError,
   AiNotAssignableTypeError,
   AiTypeErrorKind,
+  AiUnDeclaredVariableError,
 } from "../../errors/AiTypeError.js";
 import { TypeError } from "../../index.js";
 import { I18nLocalizerResult, I18nMessage, I18nMessages } from "../core.js";
@@ -31,6 +33,12 @@ export const typeErrorMessage = {
     CanNotAssignToImmutableVariable(name: string) {
       return `変数\`${name}\`は不変なので、新たに代入することはできません。`;
     },
+    UnDeclaredVariable(name: string) {
+      return `変数\`${name}\`は定義されていません。`;
+    },
+    CanNotReadProperty(target: string, name: string) {
+      return `型\`${target}\`から\`${name}\`プロパティを読み取れません。`;
+    },
   } satisfies I18nMessage<keyof typeof AiTypeErrorKind>,
 } satisfies I18nMessages;
 
@@ -52,6 +60,10 @@ export const typeErrorLocalizer = (
     return ["typing.MissingArgumentError", [error.pos, error.expectType]];
   } else if (error instanceof AiCanNotAssignToImmutableVariableError) {
     return ["typing.CanNotAssignToImmutableVariable", [error.name]];
+  } else if (error instanceof AiUnDeclaredVariableError) {
+    return ["typing.UnDeclaredVariable", [error.name]];
+  } else if (error instanceof AiCanNotReadPropertyError) {
+    return ["typing.CanNotReadProperty", [error.targetType, error.name]];
   }
 
   switch (error.kind) {
@@ -71,9 +83,15 @@ export const typeErrorLocalizer = (
       ];
 
     case AiTypeErrorKind.MissingArgumentError:
-      return ["typing.MissingArgumentError", [-1, "<:unknown:>"]];
+      return ["typing.MissingArgumentError", [NaN, "<:unknown:>"]];
 
     case AiTypeErrorKind.CanNotAssignToImmutableVariable:
       return ["typing.CanNotAssignToImmutableVariable", ["<:unknown:>"]];
+
+    case AiTypeErrorKind.UnDeclaredVariable:
+      return ["typing.UnDeclaredVariable", ["<:unknown:>"]];
+
+    case AiTypeErrorKind.CanNotReadProperty:
+      return ["typing.CanNotReadProperty", ["<:unknown:>", "<:unknown:>"]];
   }
 };
