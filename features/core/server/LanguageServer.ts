@@ -18,6 +18,7 @@ import { TypeChecker } from "../typing/TypeChecker.js";
 import { typeErrorLocalizer } from "../i18n/aiscript/typeError.js";
 import { AiScriptError } from "@syuilo/aiscript/error.js";
 import { SourceLocation } from "../parser/SourceRange.js";
+import { createGlobalScope } from "../typing/Scope.js";
 
 export * as Lsp from "vscode-languageserver";
 export * as TextDocument from "vscode-languageserver-textdocument";
@@ -29,7 +30,7 @@ export class LanguageServer {
     private i18n: AiScriptI18n,
     private conn: Connection,
     private parser = new Parser(),
-    private typeChecker = new TypeChecker()
+    private typeChecker = new TypeChecker(createGlobalScope())
   ) {
     conn.console.log("language server started");
 
