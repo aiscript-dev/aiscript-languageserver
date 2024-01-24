@@ -2,6 +2,7 @@ import { Ast } from "@syuilo/aiscript/index.js";
 import { AiAlreadyDeclaredVariableError } from "../errors/AiTypeError.js";
 import { TypeValue, ident, primitiveType } from "./TypeValue.js";
 import { Variable } from "./Variable.js";
+import { installStdTypes } from "./std/index.js";
 
 export class Scope {
   constructor(
@@ -91,4 +92,14 @@ export class NamespaceScope extends Scope {
       variable
     );
   }
+}
+
+export function createGlobalScope() {
+  const scope = new Scope();
+
+  scope.declareType(ident("void"), primitiveType("null"));
+
+  installStdTypes(scope);
+
+  return scope;
 }
