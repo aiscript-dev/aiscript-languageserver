@@ -1,7 +1,14 @@
 import { Ast } from "@syuilo/aiscript/index.js";
 import { TypeError } from "../index.js";
 import { Scope } from "./Scope.js";
-import { TypeValue } from "./TypeValue.js";
+import {
+  FunctionType,
+  PrimitiveTypeName,
+  TypeValue,
+  primitiveType,
+  primitiveTypeNames,
+  union,
+} from "./TypeValue.js";
 import {
   AiTypeError,
   AiNotAssignableTypeError,
@@ -10,31 +17,71 @@ import {
   AiMissingArgumentError,
   AiInvalidArgumentError,
   AiCanNotAssignToImmutableVariableError,
+  AiCanNotReadPropertyError,
 } from "../errors/AiTypeError.js";
+import { excludeDuplicatedType } from "../utils/excludeDuplicatedType.js";
 
 export class TypeChecker {
   constructor(public globalScope: Scope = new Scope()) {}
 
   /** 型を文字の表現に戻す */
-  reprType(type: TypeValue): string {
+  reprType(type: TypeValue, indent = 0): string {
+    const ws = "  ".repeat(indent);
+
     switch (type.type) {
-      case "NamedType": {
+      case "PrimitiveType":
+      case "PrimitiveType": {
         let res = type.name;
-        if (type.inner) {
+        if ("inner" in type && type.inner) {
           res += `<${this.reprType(type)}>`;
         }
 
         return res;
       }
 
+      case "AnyType": {
+        return "any";
+      }
+
+      case "PrimitiveType": {
+        return type.name;
+      }
+
       case "FunctionType": {
         return `@(${type.params
-          .map((x) => this.reprType(x))
+          .map((x) =>
+            // オプショナルな引数を表現する構文は無いのでとりあえず ? を付けてる
+            x.isOptional ? `${this.reprType(x.type)}?` : this.reprType(x.type)
+          )
           .join(", ")}) => ${this.reprType(type.returnType)}`;
       }
 
       case "NothingType": {
         return "<:NothingType:>";
+      }
+
+      case "UnionType": {
+        return type.contents.map((x) => this.reprType(x)).join(" | ");
+      }
+
+      case "ObjectType": {
+        if (type.items instanceof Map) {
+          return `{\n${ws}  ${[...type.items.entries()]
+            .map(
+              ([name, type]) => `${name}: ${this.reprType(type, indent + 1)}`
+            )
+            .join(`\n${ws}  `)}\n${ws}}`;
+        } else {
+          return `obj<${this.reprType(type.items)}>`;
+        }
+      }
+
+      case "ArrayType": {
+        return `arr<${this.reprType(type.item)}>`;
+      }
+
+      case "ErrorType": {
+        return "error";
       }
     }
   }
@@ -45,7 +92,7 @@ export class TypeChecker {
     errors: TypeError[]
   ): TypeValue {
     let returnType: TypeValue = {
-      type: "NamedType",
+      type: "PrimitiveType",
       name: "null",
     };
 
@@ -148,6 +195,17 @@ export class TypeChecker {
         const dest = this.runExpr(ast.dest, scope, errors);
         const value = this.runExpr(ast.expr, scope, errors);
 
+        if (ast.dest.type == "identifier" && dest.type == "NothingType") {
+          const variable = scope.getVariable(ast.dest);
+
+          scope.overrideVariable(ast.dest, {
+            isMut: variable?.isMut ?? false,
+            type: value,
+          });
+
+          return null;
+        }
+
         if (!this.isAssignableType(dest, value)) {
           errors.push(
             new AiNotAssignableTypeError(
@@ -169,9 +227,9 @@ export class TypeChecker {
     switch (ast.type) {
       case "fn": {
         const childScope = scope.createChild();
-        const params: TypeValue[] = [];
+        const params: FunctionType["params"] = [];
 
-        // rustのように、NothingTypeをどう扱われるのかで型を推論できるように
+        // TODO: rustのように、NothingTypeをどう扱われるのかで型を推論できるように
         for (const param of ast.args) {
           let paramType: TypeValue;
           if (param.argType) {
@@ -180,7 +238,10 @@ export class TypeChecker {
             paramType = { type: "NothingType" };
           }
 
-          params.push(paramType);
+          params.push({
+            isOptional: false,
+            type: paramType,
+          });
 
           const err = childScope.defineVariable(
             { type: "identifier", name: param.name, loc: ast.loc },
@@ -228,7 +289,7 @@ export class TypeChecker {
         } else if (target.type === "FunctionType") {
           for (let i = 0; i < target.params.length; i++) {
             if (i < ast.args.length) {
-              const dest = target.params[i];
+              const dest = target.params[i].type;
               const value = this.runExpr(ast.args[i], scope, errors);
 
               if (!this.isAssignableType(dest, value)) {
@@ -241,11 +302,11 @@ export class TypeChecker {
                   )
                 );
               }
-            } else {
+            } else if (!target.params[i].isOptional) {
               errors.push(
                 new AiMissingArgumentError(
                   i,
-                  this.reprType(target.params[i]),
+                  this.reprType(target.params[i].type),
                   ast.loc
                 )
               );
@@ -256,77 +317,255 @@ export class TypeChecker {
         }
 
         return {
-          type: "NamedType",
-          name: "any",
+          type: "AnyType",
         };
       }
 
       case "str": {
         return {
-          type: "NamedType",
+          type: "PrimitiveType",
           name: "str",
         };
       }
 
       case "num": {
         return {
-          type: "NamedType",
+          type: "PrimitiveType",
           name: "num",
         };
       }
 
       case "bool": {
         return {
-          type: "NamedType",
+          type: "PrimitiveType",
           name: "bool",
         };
       }
 
       case "null": {
         return {
-          type: "NamedType",
+          type: "PrimitiveType",
           name: "null",
         };
       }
 
       case "arr": {
+        let itemType: TypeValue;
+        const itemTypes = ast.value.map((x) => this.runExpr(x, scope, errors));
+
+        if (ast.value.length == 0 || itemTypes.length === 0) {
+          itemType = { type: "AnyType" };
+        } else if (itemTypes.length === 1) {
+          itemType = itemTypes[0];
+        } else {
+          itemType = {
+            type: "UnionType",
+            contents: excludeDuplicatedType(itemTypes, this),
+          };
+        }
+
         return {
-          type: "NamedType",
-          name: "arr",
+          type: "ArrayType",
+          item: itemType,
         };
       }
 
       case "obj": {
+        const items = new Map<string, TypeValue>();
+
+        for (const [name, expr] of ast.value) {
+          items.set(name, this.runExpr(expr, scope, errors));
+        }
+
         return {
-          type: "NamedType",
-          name: "obj",
+          type: "ObjectType",
+          items,
         };
       }
 
       case "identifier": {
-        return (
-          scope.getVariable(ast)?.type ?? {
-            type: "NamedType",
-            name: "any",
+        const variable = scope.getVariable(ast);
+
+        if (variable == null) {
+          return {
+            type: "AnyType",
+          };
+        }
+
+        return variable.type;
+      }
+
+      case "prop": {
+        const target = this.runExpr(ast.target, scope, errors);
+
+        if (target.type == "ObjectType") {
+          if (target.items instanceof Map) {
+            return (
+              target.items.get(ast.name) ?? {
+                type: "AnyType",
+              }
+            );
+          } else {
+            return target.items;
           }
+        } else {
+          errors.push(
+            new AiCanNotReadPropertyError(
+              this.reprType(target),
+              ast.name,
+              ast.loc
+            )
+          );
+
+          return {
+            type: "AnyType",
+          };
+        }
+      }
+
+      case "index": {
+        const target = this.runExpr(ast.target, scope, errors);
+        const indexType = this.runExpr(ast.index, scope, errors);
+
+        if (target.type == "ObjectType") {
+          if (target.items instanceof Map) {
+            return union(...excludeDuplicatedType(target.items.values(), this));
+          } else {
+            return target.items;
+          }
+        } else if (target.type == "ArrayType") {
+          return target.item;
+        } else {
+          errors.push(
+            new AiCanNotReadPropertyError(
+              this.reprType(target),
+              this.reprType(indexType),
+              ast.loc
+            )
+          );
+
+          return {
+            type: "AnyType",
+          };
+        }
+      }
+
+      case "and": {
+        const left = this.runExpr(ast.left, scope, errors);
+        const right = this.runExpr(ast.right, scope, errors);
+
+        if (!this.isAssignableType(primitiveType("bool"), left)) {
+          errors.push(
+            new AiNotAssignableTypeError(
+              this.reprType(primitiveType("bool")),
+              this.reprType(left),
+              ast.left.loc
+            )
+          );
+        }
+
+        if (!this.isAssignableType(primitiveType("bool"), right)) {
+          errors.push(
+            new AiNotAssignableTypeError(
+              this.reprType(primitiveType("bool")),
+              this.reprType(right),
+              ast.right.loc
+            )
+          );
+        }
+
+        return primitiveType("bool");
+      }
+
+      case "or": {
+        const left = this.runExpr(ast.left, scope, errors);
+        const right = this.runExpr(ast.right, scope, errors);
+
+        if (!this.isAssignableType(primitiveType("bool"), left)) {
+          errors.push(
+            new AiNotAssignableTypeError(
+              this.reprType(primitiveType("bool")),
+              this.reprType(left),
+              ast.left.loc
+            )
+          );
+        }
+
+        if (!this.isAssignableType(primitiveType("bool"), right)) {
+          errors.push(
+            new AiNotAssignableTypeError(
+              this.reprType(primitiveType("bool")),
+              this.reprType(right),
+              ast.right.loc
+            )
+          );
+        }
+
+        return primitiveType("bool");
+      }
+
+      case "not": {
+        const expr = this.runExpr(ast.expr, scope, errors);
+
+        if (!this.isAssignableType(primitiveType("bool"), expr)) {
+          errors.push(
+            new AiNotAssignableTypeError(
+              this.reprType(primitiveType("bool")),
+              this.reprType(expr),
+              ast.expr.loc
+            )
+          );
+        }
+
+        return primitiveType("bool");
+      }
+
+      case "exists": {
+        return primitiveType("bool");
+      }
+
+      case "if": {
+        this.runExpr(ast.cond, scope, errors);
+
+        const res = [];
+
+        res.push(this.run(ast.then, scope, errors));
+
+        for (const tree of ast.elseif) {
+          this.runExpr(tree.cond, scope, errors);
+
+          res.push(this.run(tree.then, scope, errors));
+        }
+
+        if (ast.else) {
+          res.push(this.run(ast.else, scope, errors));
+        }
+
+        return union(
+          ...excludeDuplicatedType(
+            res.filter((x): x is typeof x & {} => x != null),
+            this
+          )
         );
       }
 
       default: {
         return {
-          type: "NamedType",
-          name: "any",
+          type: "AnyType",
         };
       }
     }
   }
 
-  /** `dest`に`value`が代入可能であるか確認 */
+  /** `dest`に`value`が代入可能であるか */
   isAssignableType(dest: TypeValue, value: TypeValue): boolean {
-    if (
-      (dest.type === "NamedType" && dest.name === "any") ||
-      (value.type === "NamedType" && value.name === "any")
-    ) {
+    if (value.type === "AnyType") {
+      return true;
+    } else if (dest.type === "AnyType") {
+      return true;
+    }
+
+    if (dest.type === "ErrorType" && value.type == "ErrorType") {
       return true;
     }
 
@@ -339,17 +578,79 @@ export class TypeChecker {
         const x = dest.params[i];
         const y = value.params[i];
 
-        if (!this.isAssignableType(x, y)) return false;
+        if (x.isOptional && !y.isOptional) return false;
+
+        if (!this.isAssignableType(x.type, y.type)) return false;
       }
 
       return true;
     }
 
-    if (dest.type === "NamedType" && value.type === "NamedType") {
-      if (dest.name !== value.name) return false;
+    if (dest.type === "PrimitiveType" && value.type === "PrimitiveType") {
+      return dest.name === value.name;
+    }
 
-      if (dest.inner && value.inner)
-        return this.isAssignableType(dest.inner, value.inner);
+    if (dest.type === "ObjectType" && value.type === "ObjectType") {
+      if (dest.items instanceof Map && value.items instanceof Map) {
+        for (const [name, destType] of dest.items) {
+          const valueType = value.items.get(name);
+
+          if (!valueType || !this.isAssignableType(destType, valueType))
+            return false;
+        }
+
+        return true;
+      } else if (dest.items instanceof Map) {
+        const valueType =
+          value.items instanceof Map
+            ? union(...excludeDuplicatedType(value.items.values(), this))
+            : value.items;
+
+        for (const [_, destType] of dest.items) {
+          if (!this.isAssignableType(destType, valueType)) return false;
+        }
+
+        return true;
+      } else if (value.items instanceof Map) {
+        const destType =
+          dest.items instanceof Map
+            ? union(...excludeDuplicatedType(dest.items.values(), this))
+            : dest.items;
+
+        for (const [_, valueType] of value.items) {
+          if (!this.isAssignableType(destType, valueType)) return false;
+        }
+
+        return true;
+      } else {
+        const destValue =
+          dest.items instanceof Map
+            ? union(...excludeDuplicatedType(dest.items.values(), this))
+            : dest.items;
+
+        const valueType =
+          value.items instanceof Map
+            ? union(...excludeDuplicatedType(value.items.values(), this))
+            : value.items;
+
+        return this.isAssignableType(destValue, valueType);
+      }
+    }
+
+    if (dest.type === "ArrayType" && value.type === "ArrayType") {
+      return this.isAssignableType(dest.item, value.item);
+    }
+
+    if (dest.type === "UnionType" && value.type !== "UnionType") {
+      for (const destType of dest.contents) {
+        if (this.isAssignableType(destType, value)) return true;
+      }
+
+      return false;
+    } else if (dest.type === "UnionType" && value.type === "UnionType") {
+      for (const valueType of value.contents) {
+        if (!this.isAssignableType(dest, valueType)) return false;
+      }
 
       return true;
     }
@@ -359,8 +660,7 @@ export class TypeChecker {
 
   /** 呼び出し可能な型なのかチェック */
   isCallableType(type: TypeValue): boolean {
-    if (type.type === "NamedType" && type.name === "any") return true;
-
+    if (type.type === "AnyType") return true;
     if (type.type === "FunctionType") return true;
 
     return false;
@@ -374,22 +674,39 @@ export class TypeChecker {
   ): TypeValue {
     switch (ast.type) {
       case "namedTypeSource": {
-        const inner =
-          ast.inner && this.inferFromTypeSource(ast.inner, scope, errors);
+        if (primitiveTypeNames.some((x) => x === ast.name)) {
+          return {
+            type: "PrimitiveType",
+            name: ast.name as PrimitiveTypeName,
+          };
+        } else if (ast.name === "obj") {
+          return {
+            type: "ObjectType",
+            items: ast.inner
+              ? this.inferFromTypeSource(ast.inner, scope, errors)
+              : { type: "AnyType" },
+          };
+        } else if (ast.name === "arr") {
+          return {
+            type: "ArrayType",
+            item: ast.inner
+              ? this.inferFromTypeSource(ast.inner, scope, errors)
+              : { type: "AnyType" },
+          };
+        }
 
         return {
-          type: "NamedType",
-          name: ast.name,
-          inner: inner,
+          type: "AnyType",
         };
       }
 
       case "fnTypeSource": {
         return {
           type: "FunctionType",
-          params: ast.args.map((x) =>
-            this.inferFromTypeSource(x, scope, errors)
-          ),
+          params: ast.args.map((x) => ({
+            isOptional: false,
+            type: this.inferFromTypeSource(x, scope, errors),
+          })),
           returnType: this.inferFromTypeSource(ast.result, scope, errors),
         };
       }

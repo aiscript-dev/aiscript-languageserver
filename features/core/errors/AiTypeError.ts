@@ -8,6 +8,8 @@ export enum AiTypeErrorKind {
   MissingArgumentError,
   InvalidArgumentError,
   CanNotAssignToImmutableVariable,
+  UnDeclaredVariable,
+  CanNotReadProperty,
 }
 
 export class AiTypeError extends Error {
@@ -62,5 +64,21 @@ export class AiInvalidArgumentError extends AiTypeError {
 export class AiCanNotAssignToImmutableVariableError extends AiTypeError {
   constructor(public name: string, location: SourceLocation) {
     super(AiTypeErrorKind.CanNotAssignToImmutableVariable, location);
+  }
+}
+
+export class AiUnDeclaredVariableError extends AiTypeError {
+  constructor(public name: string, location: SourceLocation) {
+    super(AiTypeErrorKind.UnDeclaredVariable, location);
+  }
+}
+
+export class AiCanNotReadPropertyError extends AiTypeError {
+  constructor(
+    public targetType: string,
+    public name: string,
+    location: SourceLocation
+  ) {
+    super(AiTypeErrorKind.CanNotReadProperty, location);
   }
 }

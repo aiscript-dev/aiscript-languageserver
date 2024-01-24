@@ -11,6 +11,8 @@ import {
   AiMissingArgumentError,
   AiInvalidArgumentError,
   AiCanNotAssignToImmutableVariableError,
+  AiUnDeclaredVariableError,
+  AiCanNotReadPropertyError,
 } from "./AiTypeError.js";
 
 export type ParserError =
@@ -25,4 +27,6 @@ export type TypeError =
   | AiCanNotCallError
   | AiMissingArgumentError
   | AiInvalidArgumentError
-  | AiCanNotAssignToImmutableVariableError;
+  | AiCanNotAssignToImmutableVariableError
+  | AiUnDeclaredVariableError
+  | AiCanNotReadPropertyError;

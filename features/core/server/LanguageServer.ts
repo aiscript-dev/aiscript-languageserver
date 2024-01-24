@@ -16,6 +16,8 @@ import { parserErrorLocalizer } from "../i18n/aiscript/syntaxError.js";
 import { aiLocation2LspPosition } from "./location.js";
 import { TypeChecker } from "../typing/TypeChecker.js";
 import { typeErrorLocalizer } from "../i18n/aiscript/typeError.js";
+import { AiScriptError } from "@syuilo/aiscript/error.js";
+import { SourceLocation } from "../parser/SourceRange.js";
 
 export * as Lsp from "vscode-languageserver";
 export * as TextDocument from "vscode-languageserver-textdocument";
@@ -61,7 +63,9 @@ export class LanguageServer {
     this.conn.console.log("did change content - " + change.document.uri);
 
     try {
+      this.conn.console.log("start parse");
       const ast = this.parser.parseFromString(text, parserErrors);
+      this.conn.console.log("end parse");
       for (const error of parserErrors) {
         const message = this.i18n.localize(parserErrorLocalizer, error);
 
@@ -77,8 +81,10 @@ export class LanguageServer {
       }
 
       const scope = this.typeChecker.globalScope.copy();
+      this.conn.console.log("start type check");
       this.typeChecker.preRunBlock(ast, scope, typeErrors);
       this.typeChecker.runBlock(ast, scope, typeErrors);
+      this.conn.console.log("end type check");
 
       for (const error of typeErrors) {
         const message = this.i18n.localize(typeErrorLocalizer, error);
@@ -99,20 +105,21 @@ export class LanguageServer {
         diagnostics: diagnostics,
       });
     } catch (err) {
+      const loc: SourceLocation = (err instanceof AiScriptError
+        ? err.loc
+        : null) ?? {
+        column: 0,
+        line: 0,
+      };
+
       this.conn.sendDiagnostics({
         uri: change.document.uri,
         diagnostics: [
           {
             message: "" + err,
             range: {
-              start: {
-                character: 0,
-                line: 0,
-              },
-              end: {
-                character: 0,
-                line: 9,
-              },
+              start: aiLocation2LspPosition(loc),
+              end: aiLocation2LspPosition(loc),
             },
           },
         ],
